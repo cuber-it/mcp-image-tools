@@ -20,6 +20,7 @@ from mcp_image_tools.workspace import Workspace
 
 JPEG_QUALITY = 85
 FORMATS_WITHOUT_ALPHA = ("JPEG", "BMP")
+PORTABLE_MODES = ("1", "L", "LA", "P", "RGB", "RGBA")
 
 
 @dataclass(frozen=True)
@@ -28,7 +29,7 @@ class Picture:
 
     Attributes:
         data: The encoded picture.
-        image_format: Its format in lower case, for instance ``png``.
+        image_format: Its format, for instance ``PNG``.
         width: Width in pixels.
         height: Height in pixels.
     """
@@ -118,9 +119,7 @@ def convert(
     with _opened(source) as picture:
         converted = _encoded(picture, image_format, max_edge)
     destination = (
-        space.resolve(into)
-        if into
-        else source.with_suffix(f".{converted.image_format}")
+        space.resolve(into) if into else source.with_suffix(f".{image_format.lower()}")
     )
     return _stored(destination, converted.data)
 
@@ -142,6 +141,11 @@ def write(space: Workspace, path: str, data: str) -> Facts:
         decoded = base64.b64decode(data, validate=True)
     except (binascii.Error, ValueError) as err:
         raise ToolError("that is not valid base64 data") from err
+    try:
+        with Image.open(io.BytesIO(decoded)) as check:
+            check.load()
+    except (UnidentifiedImageError, OSError) as err:
+        raise ToolError("that data is not a picture") from err
     return _stored(space.resolve(path), decoded)
 
 
@@ -202,15 +206,15 @@ def _encoded(picture: Image.Image, image_format: str, max_edge: int) -> Picture:
     """
     if max_edge < 0:
         raise ToolError(f"an edge of {max_edge} pixels is not a size")
-    prepared = picture
-    longest = max(picture.size)
+    prepared = _portable(picture)
+    longest = max(prepared.size)
     if 0 < max_edge < longest:
         factor = max_edge / longest
         size = (
-            max(1, round(picture.width * factor)),
-            max(1, round(picture.height * factor)),
+            max(1, round(prepared.width * factor)),
+            max(1, round(prepared.height * factor)),
         )
-        prepared = picture.resize(size, Image.Resampling.LANCZOS)
+        prepared = prepared.resize(size, Image.Resampling.LANCZOS)
 
     if image_format in FORMATS_WITHOUT_ALPHA and prepared.has_transparency_data:
         backing = Image.new("RGB", prepared.size, (255, 255, 255))
@@ -223,9 +227,31 @@ def _encoded(picture: Image.Image, image_format: str, max_edge: int) -> Picture:
     options = {"quality": JPEG_QUALITY} if image_format == "JPEG" else {}
     try:
         prepared.save(buffer, format=image_format, **options)
-    except (OSError, ValueError, KeyError) as err:
+    except (OSError, ValueError) as err:
         raise ToolError(f"could not encode as {image_format}: {err}") from err
-    return Picture(buffer.getvalue(), image_format.lower(), *prepared.size)
+    return Picture(buffer.getvalue(), image_format, *prepared.size)
+
+
+def _portable(picture: Image.Image) -> Image.Image:
+    """Return a picture in a mode every format here can write.
+
+    Colour spaces such as CMYK become RGB. Greyscale deeper than 8 bits is
+    stretched from its darkest to its lightest value, because Pillow cuts
+    everything above 255 to white.
+    """
+    if picture.mode in PORTABLE_MODES:
+        return picture
+    if picture.mode.startswith(("I", "F")):
+        low, high = picture.getextrema()
+        if high == low:
+            return picture.convert("L")
+        scale = 255 / (high - low)
+        # point() takes only a linear expression of the form value * a + b.
+        stretched = picture.convert("F").point(
+            lambda value: value * scale + -low * scale
+        )
+        return stretched.convert("L")
+    return picture.convert("RGBA" if picture.has_transparency_data else "RGB")
 
 
 def _stored(path: Path, data: bytes) -> Facts:
@@ -235,13 +261,8 @@ def _stored(path: Path, data: bytes) -> Facts:
     leaves no broken picture behind.
 
     Raises:
-        ToolError: The data is not a picture, or the file cannot be written.
+        ToolError: The file cannot be written.
     """
-    try:
-        with Image.open(io.BytesIO(data)) as check:
-            check.load()
-    except (UnidentifiedImageError, OSError) as err:
-        raise ToolError("that data is not a picture") from err
     partial = path.with_name(f".{path.name}.partial")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -259,7 +280,7 @@ def _facts_of(path: Path, picture: Image.Image) -> Facts:
     """Describe an opened picture and the file it came from."""
     return Facts(
         path=str(path),
-        image_format=picture.format or "unknown",
+        image_format=picture.format,
         width=picture.width,
         height=picture.height,
         mode=picture.mode,

@@ -95,9 +95,8 @@ def catalogue(space: Workspace) -> Catalogue:
 
         Stichworte: Bild umwandeln, konvertieren, Format ändern, als JPEG.
         """
-        return (
-            f"wrote {pictures.convert(space, path, target, into, max_edge).describe()}"
-        )
+        written = pictures.convert(space, path, target, into, max_edge)
+        return f"wrote {written.describe()}"
 
     def write(path: str, data: str) -> str:
         """Write a picture from base64 data to a file: save, store an image.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 import pytest
 from mcp.server.mcpserver import exceptions
@@ -19,7 +20,7 @@ SWITCHED_ON = {
 }
 
 
-def published(tmp_path: Path) -> dict[str, object]:
+def published(tmp_path: Path) -> dict[str, Any]:
     """Return the tools a server on a fresh workspace publishes, by name."""
     tools = asyncio.run(app.build(Workspace(working_dir=tmp_path)).list_tools())
     return {tool.name: tool for tool in tools}

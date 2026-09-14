@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import io
 import os
+import warnings
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,9 @@ from PIL import Image
 from drawing import encoded, make_picture
 from mcp_image_tools import ToolError, Workspace, pictures
 from mcp_image_tools.workspace import DEFAULT_MAX_EDGE
+
+MODES = ["1", "L", "LA", "P", "RGB", "RGBA", "CMYK", "I;16", "I", "F"]
+FORMATS = ["PNG", "JPEG", "WEBP", "GIF", "BMP"]
 
 
 def opened(data: bytes) -> Image.Image:
@@ -24,7 +28,7 @@ def opened(data: bytes) -> Image.Image:
 def test_reading_returns_the_picture_as_png(space: Workspace) -> None:
     shown = pictures.read(space, "a.png")
 
-    assert (shown.image_format, shown.width, shown.height) == ("png", 40, 20)
+    assert (shown.image_format, shown.width, shown.height) == ("PNG", 40, 20)
     assert opened(shown.data).format == "PNG"
     assert opened(shown.data).size == (40, 20)
 
@@ -140,6 +144,63 @@ def test_converting_writes_beside_the_original(
     stored = tmp_path / f"source.{suffix}"
     assert Path(written.path) == stored
     assert opened(stored.read_bytes()).format == written.image_format
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_every_colour_mode_can_be_read(
+    space: Workspace, tmp_path: Path, mode: str
+) -> None:
+    make_picture(tmp_path / "source.tiff", mode=mode)
+
+    assert opened(pictures.read(space, "source.tiff").data).format == "PNG"
+
+
+def test_deep_greyscale_keeps_its_shades(space: Workspace, tmp_path: Path) -> None:
+    deep = Image.new("I;16", (3, 1))
+    for column, value in enumerate((0, 30000, 60000)):
+        deep.putpixel((column, 0), value)
+    deep.save(tmp_path / "deep.png")
+
+    shown = opened(pictures.read(space, "deep.png").data)
+
+    darkest, middle, lightest = (shown.getpixel((column, 0)) for column in range(3))
+    assert (darkest, lightest) == (0, 255)
+    assert 120 < middle < 135
+
+
+def test_cmyk_keeps_its_colour(space: Workspace, tmp_path: Path) -> None:
+    make_picture(tmp_path / "print.jpeg", mode="CMYK")
+
+    red, green, blue = opened(pictures.read(space, "print.jpeg").data).getpixel((5, 5))
+
+    assert red > 200
+    assert green < 50
+    assert blue < 50
+
+
+@pytest.mark.parametrize("target", FORMATS)
+@pytest.mark.parametrize("mode", MODES)
+def test_every_colour_mode_can_be_converted(
+    space: Workspace, tmp_path: Path, mode: str, target: str
+) -> None:
+    make_picture(tmp_path / "source.tiff", mode=mode)
+
+    written = pictures.convert(space, "source.tiff", target)
+
+    assert opened(Path(written.path).read_bytes()).format == target
+
+
+def test_a_refused_picture_leaves_no_file_open(
+    space: Workspace, tmp_path: Path
+) -> None:
+    (tmp_path / "half.png").write_bytes(encoded()[:20])
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", ResourceWarning)
+        with pytest.raises(ToolError):
+            pictures.read(space, "half.png")
+
+    assert [str(w.message) for w in caught if w.category is ResourceWarning] == []
 
 
 @pytest.mark.usefixtures("picture")

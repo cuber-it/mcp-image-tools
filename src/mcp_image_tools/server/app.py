@@ -71,7 +71,7 @@ def _published(tool: Tool) -> Tool:
         except ToolError as err:
             raise AnticipatedError(str(err)) from err
         if isinstance(result, Picture):
-            return Image(data=result.data, format=result.image_format)
+            return Image(data=result.data, format=result.image_format.lower())
         return result
 
     if get_type_hints(tool).get("return") is Picture:

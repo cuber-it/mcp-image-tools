@@ -7,14 +7,21 @@ from pathlib import Path
 
 from PIL import Image
 
-COLOURS = {"RGBA": (255, 0, 0, 128), "P": 1}
+COLOURS = {
+    "RGB": (255, 0, 0),
+    "RGBA": (255, 0, 0, 128),
+    "LA": (200, 128),
+    "CMYK": (0, 255, 255, 0),
+}
+# Single-channel modes take one number; for "P" it is an index into the palette.
+GREY = 200
 
 
 def make_picture(
     path: Path, size: tuple[int, int] = (40, 20), mode: str = "RGB"
 ) -> Path:
     """Write a picture of a given size and mode, and return its path."""
-    Image.new(mode, size, COLOURS.get(mode, (255, 0, 0))).save(path)
+    Image.new(mode, size, COLOURS.get(mode, GREY)).save(path)
     return path
 
 
