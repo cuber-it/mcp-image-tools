@@ -1,5 +1,7 @@
 # mcp-image-tools
 
+**Version 8.0 — completely rewritten and revised.**
+
 Image tools for AI assistants: look at a picture, describe it, scale it,
 convert it, write one. Usable as a Python library or served over the Model
 Context Protocol.
@@ -84,6 +86,14 @@ Authentication over HTTP is configured with `MCP_OAUTH_ENABLED`,
 `MCP_OAUTH_SERVER_URL`, `MCP_PUBLIC_URL` and `MCP_AUTH_METHOD`; the server
 refuses to listen beyond this machine without it.
 
+## Development
+
+Setup, checks, release steps and the rules the code keeps:
+[doc/development.md](https://github.com/cuber-it/mcp-image-tools/blob/master/doc/development.md).
+Changes are listed in
+[CHANGES.md](https://github.com/cuber-it/mcp-image-tools/blob/master/CHANGES.md).
+
 ## License
 
-MIT, see LICENSE.
+MIT, see
+[LICENSE](https://github.com/cuber-it/mcp-image-tools/blob/master/LICENSE).

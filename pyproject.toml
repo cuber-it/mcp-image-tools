@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-image-tools"
-version = "1.0.0"
+version = "8.0.0"
 description = "Image tools for AI assistants, as a Python library and an MCP server"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -42,6 +42,8 @@ mcp-image-tools = "mcp_image_tools.server.app:main"
 [project.urls]
 Homepage = "https://www.uc-it.de"
 Repository = "https://github.com/cuber-it/mcp-image-tools"
+Documentation = "https://github.com/cuber-it/mcp-image-tools/tree/master/doc"
+Changelog = "https://github.com/cuber-it/mcp-image-tools/blob/master/CHANGES.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
